@@ -30,21 +30,25 @@ class SignTransactionUseCaseImpl @Inject constructor(
     ) {
         _state.update { SigningState.InProgress }
 
-        val request = SigningRequest(
-            challenge = quotation.challenge,
-            strategy = strategy,
-            operationType = operationType
-        )
+        try {
+            val request = SigningRequest(
+                challenge = quotation.challenge,
+                strategy = strategy,
+                operationType = operationType
+            )
 
-        val isSuccess = transactionService.submit(
-            quotation = quotation,
-            strategy = request.strategy
-        )
+            val isSuccess = transactionService.submit(
+                quotation = quotation,
+                strategy = request.strategy
+            )
 
-        if (isSuccess) {
-            _state.update { SigningState.Success("Transaction signed and submitted successfully.") }
-        } else {
-            _state.update { SigningState.Error("The transaction could not be signed.") }
+            if (isSuccess) {
+                _state.update { SigningState.Success("Transaction signed and submitted successfully.") }
+            } else {
+                _state.update { SigningState.Error("The transaction could not be signed.") }
+            }
+        } catch (cause: Exception) {
+            _state.update { SigningState.Error("An error occurred during signing: ${cause.message}") }
         }
     }
 

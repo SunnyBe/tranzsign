@@ -34,7 +34,8 @@ class MoneyFormatterImpl @Inject constructor() : MoneyFormatter {
 
         val formattedNumber = numberFormat.format(amount)
 
-        return if (isSymbolAtEnd(locale)) { // Better UX for right-to-left languages
+        // Some locales place the currency symbol after the number (e.g., "1,234.56 €")
+        return if (isSymbolAtEnd(locale)) {
             "$formattedNumber $currencyCode"
         } else {
             "$currencyCode $formattedNumber"
