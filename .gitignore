@@ -1,0 +1,37 @@
+# Build output
+/build/
+/app/build/
+.gradle/
+
+# IDE files
+*.iml
+/.idea/
+
+# Local configuration
+local.properties
+
+# Keystore files
+*.jks
+*.keystore
+
+# Sensitive configuration
+# If you have a google-services.json file with sensitive data, uncomment the next line
+# google-services.json
+
+# Binaries
+*.apk
+*.aab
+*.ap_
+
+# Native build output
+.cxx/
+.externalNativeBuild/
+
+# Screen captures
+/captures/
+
+# Lint
+lint-baseline.xml
+
+# macOS
+.DS_Store
