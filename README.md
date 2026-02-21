@@ -1,22 +1,21 @@
 # TranzSign: A High-Precision ETH Wallet Prototype
 
-I built TranzSign to explore how we can bridge the gap between complex blockchain data and a smooth, "human-friendly" mobile experience. This project demonstrates a production-grade approach to handling Ethereum’s 18-decimal precision while maintaining a clean, localized UI.
-
+This project is a high-precision Ethereum withdrawal implementation developed as a technical showcase. The goal was to solve the core challenges of DeFi mobile engineering: managing 18-decimal precision (Wei), ensuring atomic transaction lifecycles, and delivering a localized, high-trust financial UI.
 ## 🧠 Architectural Thinking
 
 **Basic Withdrawal Flow**
 
-[Basic Withdrawal Flow](docs/basic_withdrawal_happy_path.png)
+![Basic Withdrawal Flow](./docs/basic_withdrawal_happy_path.png)
 
 ### The "Atomic" Transaction Problem
-One of the biggest friction points in wallet UX is when a transaction is signed but fails to broadcast, leaving the user in limbo. I designed the `SignTransactionUseCase` to be an atomic unit of work. It handles the signing and the network submission as one continuous lifecycle. This ensures the UI state—from "Signing" to "Success"—comes from a single source of truth, preventing "orphaned" signatures and keeping the local state perfectly in sync with the chain.
+One of the biggest friction points in wallet UX is when a transaction is signed but fails to broadcast, leaving the user in limbo. I designed the `SignTransactionUseCase` to be an atomic unit of work. It handles the signing and the network submission as one continuous lifecycle. This ensures the UI state from "Signing" to "Success" comes from a single source of truth, preventing "orphaned" signatures and keeping the local state perfectly in sync with the chain.
 
 ### Why I chose MVI (Unidirectional Data Flow)
 In a withdrawal flow, everything is interdependent: your balance, your input, the gas fee, and the withdrawal limit. I used a reactive `combine` strategy in the ViewModel to ensure these inputs are evaluated together in real-time. This means the "Confirm" button and error states react instantly to every keystroke, eliminating the "laggy" validation common in many crypto apps.
 
 **Basic Architectural Overview High-level**
 
-[Basic Architectural Overview High-level](docs/basic_architectural_overview_high_level.png)
+![Basic Architectural Overview High-level](./docs/basic_architectural_overview.png)
 
 ### Handling "The Dust" & Precision
 Standard rounding is dangerous in DeFi. If the app rounds up a balance of `0.0049` to `0.01`, the user’s transaction will fail with an "Insufficient Funds" error.
