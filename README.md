@@ -1,7 +1,7 @@
 # TranzSign: A High-Precision ETH Wallet Prototype
 
 This project is a high-precision Ethereum withdrawal implementation developed as a technical showcase. The goal was to solve the core challenges of DeFi mobile engineering: managing 18-decimal precision (Wei), ensuring atomic transaction lifecycles, and delivering a localized, high-trust financial UI.
-## 🧠 Architectural Thinking
+## Architectural Thinking
 
 **Basic Withdrawal Flow**
 
@@ -25,15 +25,18 @@ To avoid the precision loss inherent in floating-point math, all internal logic 
 ### Global-Ready Formatting
 The formatting engine respects the User's OS Locale for decimal separators and intelligently places the "ETH" symbol based on regional standards (e.g., `1.2 ETH` vs `ETH 1,2`), ensuring the app feels native to a global audience.
 
-## 🛠 Tech Choices
+## Tech Choices
 * **Jetpack Compose:** For a completely declarative UI that stays in sync with the ViewModel state.
 * **BigInteger (Wei)/BigDecimal:** All internal math is done in Wei to avoid the precision loss inherent in `Double` or `Float`.
 * **Kotlin Coroutines/Flow:** For handling the asynchronous nature of blockchain simulations and state updates.
 * **Turbine:** Used in unit tests to verify the flow of the MVI state machine.
 
-## 🛑 Scope & Assumptions
+## Scope & Assumptions
 To keep the focus on the core architectural and mathematical challenges of this assignment, I have omitted standard "production-ready" boilerplate:
 * **CI/CD & Linting:** I've skipped custom linting rules, Ktlint, and CI pipeline configurations.
 * **Analytics & Crashlytics:** No tracking or telemetry has been integrated.
 * **Security:** This is a prototype; a production version would utilize the Android Keystore for private key management and hardware-backed security.
 * **Backend:** Network calls are abstracted via an `InMemoryBackendService` to focus on the UI and domain logic.
+
+## Demos
+Demo screenshots and videos are available in the `docs` folder, showcasing the withdrawal flow. 
