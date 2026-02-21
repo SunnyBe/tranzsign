@@ -40,3 +40,7 @@ To keep the focus on the core architectural and mathematical challenges of this 
 
 ## Demos
 Demo screenshots and videos are available in the `docs` folder, showcasing the withdrawal flow. 
+
+Demo Withrawal flow
+
+[Screen_recording_20260221_190930.webm](https://github.com/user-attachments/assets/f2539b1d-fa6c-4af5-b2c6-c713980100a4)
