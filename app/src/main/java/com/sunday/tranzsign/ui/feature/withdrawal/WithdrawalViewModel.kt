@@ -4,13 +4,16 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.sunday.tranzsign.R
 import com.sunday.tranzsign.domain.entity.OperationType
-import com.sunday.tranzsign.domain.entity.SigningStrategy
+import com.sunday.tranzsign.domain.entity.AuthStrategy
+import com.sunday.tranzsign.domain.entity.TransactionQuotation
 import com.sunday.tranzsign.domain.repository.AccountRepository
 import com.sunday.tranzsign.domain.service.MoneyFormatter
 import com.sunday.tranzsign.domain.service.QuotationService
+import com.sunday.tranzsign.domain.service.TransactionService
+import com.sunday.tranzsign.domain.usecase.signtransaction.SignTransactionState
 import com.sunday.tranzsign.domain.usecase.signtransaction.SignTransactionUseCase
-import com.sunday.tranzsign.domain.usecase.signtransaction.SigningState
-import com.sunday.tranzsign.ui.feature.signtransaction.TransactionSigningStrategy
+import com.sunday.tranzsign.domain.usecase.signtransaction.SigningRequest
+import com.sunday.tranzsign.ui.feature.signtransaction.TransactionAuthStrategy
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -34,6 +37,7 @@ class WithdrawalViewModel @Inject constructor(
     private val accountRepository: AccountRepository,
     private val quotationService: QuotationService,
     private val signTransactionUseCase: SignTransactionUseCase,
+    private val transactionService: TransactionService, // Rename to send transaction service
     private val moneyFormatter: MoneyFormatter
 ) : ViewModel() {
 
@@ -42,7 +46,7 @@ class WithdrawalViewModel @Inject constructor(
 
     private val _availableBalanceInWei = MutableStateFlow(BigInteger.ZERO)
     private val _quotation =
-        MutableStateFlow<com.sunday.tranzsign.domain.entity.TransactionQuotation?>(null)
+        MutableStateFlow<TransactionQuotation?>(null)
 
     private val _screenContent = MutableStateFlow<ScreenContent>(ScreenContent.Idle)
     private val _amountInput = MutableStateFlow("") // State for the text field
@@ -84,7 +88,6 @@ class WithdrawalViewModel @Inject constructor(
 
     init {
         observeBalance()
-        observeSigningState()
     }
 
     private fun observeBalance() {
@@ -101,30 +104,20 @@ class WithdrawalViewModel @Inject constructor(
             .launchIn(viewModelScope)
     }
 
-    private fun observeSigningState() {
-        signTransactionUseCase.state
-            .onEach { signingState ->
-                val screenContent = when (signingState) {
-                    is SigningState.InProgress -> ScreenContent.SigningInProgress
-                    is SigningState.Success -> ScreenContent.ShowSuccessDialog(signingState.message)
-                    is SigningState.Error -> ScreenContent.ShowErrorDialog(
-                        R.string.signing_failed_error,
-                        isCritical = false
-                    )
-
-                    is SigningState.Idle -> return@onEach
-                }
-                _screenContent.value = screenContent
-            }
-            .launchIn(viewModelScope)
-    }
-
     fun onEvent(intent: WithdrawalIntent) {
         when (intent) {
             is WithdrawalIntent.AmountChanged -> handleAmountChanged(intent.amount)
             is WithdrawalIntent.RequestQuotation -> handleRequestQuotation(intent.operationType)
-            is WithdrawalIntent.ConfirmQuotation -> handleConfirmQuotation()
-            is WithdrawalIntent.SignTransaction -> handleSignTransaction(intent.strategy)
+            is WithdrawalIntent.ConfirmQuotation -> handleConfirmQuotation(
+                intent.quotation,
+                intent.operationType
+            )
+
+            is WithdrawalIntent.SignTransaction -> handleSignTransaction(
+                intent.signingRequest,
+                intent.authStrategy
+            )
+
             is WithdrawalIntent.CompleteTransaction -> handleCompleteTransaction()
             is WithdrawalIntent.DismissDialog -> dismissDialog()
         }
@@ -148,7 +141,7 @@ class WithdrawalViewModel @Inject constructor(
                 val quotation =
                     quotationService.getQuotation(amountInWei, operationType)
                 _quotation.value = quotation
-                _screenContent.value = ScreenContent.ShowQuotation(quotation)
+                _screenContent.value = ScreenContent.ShowQuotation(quotation, operationType)
             } catch (cause: Exception) {
                 _screenContent.value = ScreenContent.ShowErrorDialog(R.string.quotation_fetch_error)
                 Timber.tag(LOG_TAG).e(cause, "Failed to create Quotation")
@@ -156,21 +149,62 @@ class WithdrawalViewModel @Inject constructor(
         }
     }
 
-    private fun handleConfirmQuotation() {
-        val currentQuotation = _quotation.value ?: return
-        _screenContent.value = ScreenContent.ShowSignDialog(currentQuotation)
+    private fun handleConfirmQuotation(
+        quotation: TransactionQuotation?,
+        operationType: OperationType
+    ) {
+        val currentQuotation = quotation ?: return
+        val signingRequest = SigningRequest(
+            quotationId = currentQuotation.id,
+            challenge = currentQuotation.challenge,
+            operationType = operationType
+        )
+        _screenContent.value = ScreenContent.ShowSignDialog(signingRequest)
     }
 
-    private fun handleSignTransaction(strategy: TransactionSigningStrategy) {
-        val currentQuotation = _quotation.value ?: return
+    private fun handleSignTransaction(
+        signingRequest: SigningRequest,
+        strategy: TransactionAuthStrategy
+    ) {
+        signTransactionUseCase(
+            quotationId = signingRequest.quotationId,
+            signingRequest = signingRequest,
+            authStrategy = strategy.mapToDomain()
+        )
+            .onEach { signingState ->
+                when (signingState) {
+                    is SignTransactionState.InProgress -> {
+                        _screenContent.value = ScreenContent.SigningInProgress
+                    }
 
-        viewModelScope.launch {
-            signTransactionUseCase.execute(
-                quotation = currentQuotation,
-                strategy = strategy.mapToDomain(),
-                operationType = OperationType.WITHDRAWAL
-            )
-        }
+                    is SignTransactionState.Success -> {
+                        _screenContent.value =
+                            ScreenContent.SendingTransaction(
+                                quotationId = signingState.result.quotationId,
+                                signedChallenge = signingState.result.signedChallenge
+                            )
+                        val submitted = transactionService.submit(
+                            signingState.result.quotationId,
+                            signingState.result.signedChallenge,
+                            strategy.mapToDomain()
+                        )
+                        if (submitted) _screenContent.value = ScreenContent.ShowSuccessDialog(
+                            R.string.withdrawal_success_message
+                        ) else _screenContent.value = ScreenContent.ShowErrorDialog(
+                            R.string.signing_failed_error,
+                            isCritical = false
+                        )
+                    }
+
+                    is SignTransactionState.Error -> {
+                        _screenContent.value = ScreenContent.ShowErrorDialog(
+                            R.string.signing_failed_error,
+                            isCritical = false
+                        )
+                    }
+                }
+
+            }.launchIn(viewModelScope)
     }
 
     private fun handleCompleteTransaction() {
@@ -180,7 +214,7 @@ class WithdrawalViewModel @Inject constructor(
     }
 
     private fun dismissDialog() {
-        signTransactionUseCase.reset()
+        _screenContent.value = ScreenContent.Idle // Reset screen content to hide any dialog
         _amountInput.value = "" // Reset amount by updating the input state
         _quotation.value = null
         _screenContent.value = ScreenContent.Idle
@@ -195,10 +229,10 @@ class WithdrawalViewModel @Inject constructor(
             .toBigIntegerExact() // Ensure no hidden fractions
     }
 
-    private fun TransactionSigningStrategy.mapToDomain() = when (this) {
-        TransactionSigningStrategy.PASSKEY -> SigningStrategy.PASSKEY
-        TransactionSigningStrategy.OTP -> SigningStrategy.OTP
-        TransactionSigningStrategy.BIOMETRIC -> SigningStrategy.BIOMETRIC
+    private fun TransactionAuthStrategy.mapToDomain() = when (this) {
+        TransactionAuthStrategy.PASSKEY -> AuthStrategy.PASSKEY
+        TransactionAuthStrategy.OTP -> AuthStrategy.OTP
+        TransactionAuthStrategy.BIOMETRIC -> AuthStrategy.BIOMETRIC
     }
 
     companion object {

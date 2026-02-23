@@ -38,4 +38,6 @@
     <string name="intro_hi">Hi, %1$s</string>
     <string name="withdrawal_success_message">Transaction was successful</string>
     <string name="selected_label">Selected</string>
+    <string name="sending_transaction_title">Sending</string>
+    <string name="sending_transaction_message">Uploading transaction</string>
 </resources>

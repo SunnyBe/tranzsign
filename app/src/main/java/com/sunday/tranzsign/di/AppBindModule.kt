@@ -2,17 +2,21 @@ package com.sunday.tranzsign.di
 
 import com.sunday.tranzsign.data.repository.AccountRepositoryImpl
 import com.sunday.tranzsign.data.repository.FeatureRepositoryImpl
+import com.sunday.tranzsign.data.service.AppCoroutineDispatcher
 import com.sunday.tranzsign.data.service.DateTimeFormatterImpl
 import com.sunday.tranzsign.data.service.MoneyFormatterImpl
 import com.sunday.tranzsign.data.service.QuotationServiceImpl
+import com.sunday.tranzsign.data.service.SignatureServiceImpl
 import com.sunday.tranzsign.data.service.TransactionServiceImpl
 import com.sunday.tranzsign.data.source.ApiService
 import com.sunday.tranzsign.data.source.InMemoryBackendService
 import com.sunday.tranzsign.domain.repository.AccountRepository
 import com.sunday.tranzsign.domain.repository.FeatureRepository
+import com.sunday.tranzsign.domain.service.CoroutineDispatcherProvider
 import com.sunday.tranzsign.domain.service.DateTimeFormatter
 import com.sunday.tranzsign.domain.service.MoneyFormatter
 import com.sunday.tranzsign.domain.service.QuotationService
+import com.sunday.tranzsign.domain.service.SignatureService
 import com.sunday.tranzsign.domain.service.TransactionService
 import dagger.Binds
 import dagger.Module
@@ -66,5 +70,17 @@ abstract class AppBindModule {
     abstract fun bindApiService(
         apiService: InMemoryBackendService
     ): ApiService
+
+    @Binds
+    @Singleton
+    abstract fun bindSignatureService(
+        impl: SignatureServiceImpl
+    ): SignatureService
+
+    @Binds
+    @Singleton
+    abstract fun bindCoroutineDispatcherProvider(
+        impl: AppCoroutineDispatcher
+    ): CoroutineDispatcherProvider
 }
 

@@ -1,11 +1,12 @@
 package com.sunday.tranzsign.ui.feature.withdrawal
 
 import androidx.annotation.StringRes
+import com.sunday.tranzsign.domain.entity.OperationType
 import com.sunday.tranzsign.domain.entity.TransactionQuotation
+import com.sunday.tranzsign.domain.usecase.signtransaction.SigningRequest
 
 // BETTER: subdivide further into smaller state, lint will complain.
 data class WithdrawalUiState(
-    val quotation: TransactionQuotation? = null,
     val availableBalanceFormatted: String = "",
     val remainingBalanceFormatted: String = "",
     val quotationAmountFormatted: String = "",
@@ -23,15 +24,21 @@ sealed interface ScreenContent {
     data object Idle : ScreenContent
     data object FetchingQuotation : ScreenContent
     data class ShowQuotation(
-        val quotation: TransactionQuotation
+        val quotation: TransactionQuotation,
+        val operationType: OperationType
     ) : ScreenContent
 
-    data class ShowSignDialog(val quotation: TransactionQuotation) : ScreenContent
+    data class ShowSignDialog(val signingRequest: SigningRequest) : ScreenContent
 
     data object SigningInProgress : ScreenContent
-    data class ShowSuccessDialog(val message: String) : ScreenContent
+    data class ShowSuccessDialog(@param:StringRes val messageRes: Int) : ScreenContent
     data class ShowErrorDialog(
         @param:StringRes val messageRes: Int,
         val isCritical: Boolean = false
+    ) : ScreenContent
+
+    data class SendingTransaction(
+        val quotationId: String,
+        val signedChallenge: String
     ) : ScreenContent
 }

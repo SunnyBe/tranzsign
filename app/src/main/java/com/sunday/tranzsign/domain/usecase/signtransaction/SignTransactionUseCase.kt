@@ -1,26 +1,44 @@
 package com.sunday.tranzsign.domain.usecase.signtransaction
 
-import com.sunday.tranzsign.domain.entity.OperationType
-import com.sunday.tranzsign.domain.entity.SigningStrategy
-import com.sunday.tranzsign.domain.entity.TransactionQuotation
+import com.sunday.tranzsign.domain.entity.AuthStrategy
+import com.sunday.tranzsign.domain.service.SignatureService
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.flow
+import javax.inject.Inject
 
-/**
- * Encapsulates the business logic for signing and submitting a transaction.
- * This makes the signing state machine reusable across different features.
- *
- * DESIGN NOTE: This UseCase is stateful to ensure atomicity between
- * cryptographic signing and network submission. This prevents "orphaned"
- * signatures and provides a single source of truth for the transaction
- * lifecycle state (InProgress, Success, Error).
- */
-interface SignTransactionUseCase {
-    val state: Flow<SigningState>
-    suspend fun execute(
-        quotation: TransactionQuotation,
-        strategy: SigningStrategy,
-        operationType: OperationType
-    )
-
-    fun reset()
+class SignTransactionUseCase @Inject constructor(
+    private val signatureService: SignatureService
+) {
+    operator fun invoke(
+        quotationId: String,
+        signingRequest: SigningRequest,
+        authStrategy: AuthStrategy
+    ): Flow<SignTransactionState> = flow {
+        emit(SignTransactionState.InProgress)
+        val signedChallenge = signatureService.sign(
+            signingRequest = signingRequest,
+            authStrategy = authStrategy
+        )
+        val result = SignTransactionResult(
+            quotationId = quotationId,
+            signedChallenge = signedChallenge
+        )
+        emit(SignTransactionState.Success(result))
+    }.catch {
+        emit(SignTransactionState.Error("An error occurred during signing: ${it.message}"))
+    }
 }
+
+// BETTER: Move to a separate file.
+sealed interface SignTransactionState {
+    object InProgress : SignTransactionState
+    data class Success(val result: SignTransactionResult) : SignTransactionState
+    data class Error(val message: String) : SignTransactionState
+}
+
+// BETTER: Move to a separate file.
+data class SignTransactionResult(
+    val quotationId: String,
+    val signedChallenge: String
+)

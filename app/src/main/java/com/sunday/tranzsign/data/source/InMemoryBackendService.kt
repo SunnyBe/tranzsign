@@ -51,7 +51,8 @@ class InMemoryBackendService @Inject constructor(
         amount: String,
         operationType: String
     ): TransactionQuotation {
-        Timber.tag(LOG_TAG).i("Mock API(GET): getWithdrawalQuotation called with amount $amount for operation $operationType")
+        Timber.tag(LOG_TAG)
+            .i("Mock API(GET): getWithdrawalQuotation called with amount $amount for operation $operationType")
         delay(1500)
         val amountInWei =
             amount.toBigIntegerOrNull() ?: throw IllegalArgumentException("Invalid amount format")
@@ -80,18 +81,18 @@ class InMemoryBackendService @Inject constructor(
         )
     }
 
-    override suspend fun submitWithdrawal(
+    override suspend fun submitTransaction(
         quotationId: String,
         signedChallenge: String,
         signingStrategy: String
-    ): Boolean {
+    ): Boolean = withContext(coroutineDispatcherProvider.io) {
         Timber.tag(LOG_TAG)
             .i("Mock API(POST): submitWithdrawal called with quotationId $quotationId and signedChallenge $signedChallenge")
         delay(2000)
         // This simulates the server accepting the transaction.
         performDebit(_lastQuotationTotalDebit)
         _lastQuotationTotalDebit = BigInteger.ZERO // Clear after use
-        return true
+        true
     }
 
     private fun performDebit(amount: BigInteger) {
@@ -100,7 +101,6 @@ class InMemoryBackendService @Inject constructor(
         _ethBalanceInWei.update { currentBalance ->
             currentBalance.minus(amount)
         }
-
     }
 
     companion object {

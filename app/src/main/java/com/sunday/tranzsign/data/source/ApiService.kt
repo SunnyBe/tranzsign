@@ -19,9 +19,10 @@ interface ApiService {
         operationType: String
     ): TransactionQuotation
 
-    suspend fun submitWithdrawal(
+    // Expected to return an object but for simplicity we return success of failure.
+    suspend fun submitTransaction(
         quotationId: String,
         signedChallenge: String,
-        signingStrategy: String
+        signingStrategy: String // For audit purposes, we log the signing strategy used for the transaction.
     ): Boolean
 }

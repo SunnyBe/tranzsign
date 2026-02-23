@@ -4,12 +4,14 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -69,7 +71,7 @@ fun WithdrawalScreen(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        androidx.compose.material3.CircularProgressIndicator()
+                        CircularProgressIndicator()
                     }
                 },
                 confirmButton = {} // No buttons, non-dismissible dialog
@@ -99,7 +101,14 @@ fun WithdrawalScreen(
                     }
                 },
                 confirmButton = {
-                    Button(onClick = { viewModel.onEvent(WithdrawalIntent.ConfirmQuotation) }) {
+                    Button(onClick = {
+                        viewModel.onEvent(
+                            WithdrawalIntent.ConfirmQuotation(
+                                quotation = content.quotation,
+                                operationType = content.operationType
+                            )
+                        )
+                    }) {
                         Text(stringResource(R.string.confirm_label))
                     }
                 },
@@ -113,13 +122,13 @@ fun WithdrawalScreen(
 
         is ScreenContent.ShowSignDialog -> {
             SignTransactionDialog(
-                // The amount now comes from the quotation object.
                 amountFormatted = uiState.amountToTransferFormatted,
                 isSigningInProgress = false,
                 onConfirm = { strategy ->
                     viewModel.onEvent(
                         WithdrawalIntent.SignTransaction(
-                            strategy
+                            signingRequest = content.signingRequest,
+                            authStrategy = strategy
                         )
                     )
                 },
@@ -136,10 +145,28 @@ fun WithdrawalScreen(
             )
         }
 
+        is ScreenContent.SendingTransaction -> {
+            AlertDialog(
+                onDismissRequest = { /* Non-dismissible */ },
+                title = { Text(text = stringResource(R.string.sending_transaction_title)) },
+                text = {
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        CircularProgressIndicator()
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(stringResource(R.string.sending_transaction_message))
+                    }
+                },
+                confirmButton = {} // No buttons, non-dismissible dialog
+            )
+        }
+
         is ScreenContent.ShowSuccessDialog -> {
             StatusDialog(
                 title = stringResource(R.string.success_label),
-                message = content.message,
+                message = stringResource(content.messageRes),
                 onDismiss = { viewModel.onEvent(WithdrawalIntent.CompleteTransaction) }
             )
         }

@@ -1,8 +1,7 @@
 package com.sunday.tranzsign.data.service
 
 import com.sunday.tranzsign.data.source.ApiService
-import com.sunday.tranzsign.domain.entity.SigningStrategy
-import com.sunday.tranzsign.domain.entity.TransactionQuotation
+import com.sunday.tranzsign.domain.entity.AuthStrategy
 import com.sunday.tranzsign.domain.service.TransactionService
 import kotlinx.coroutines.delay
 import timber.log.Timber
@@ -13,18 +12,19 @@ import javax.inject.Singleton
 class TransactionServiceImpl @Inject constructor(
     private val apiService: ApiService
 ) : TransactionService {
+
     override suspend fun submit(
-        quotation: TransactionQuotation,
-        strategy: SigningStrategy
+        quotationId: String,
+        signedChallenge: String,
+        authStrategy: AuthStrategy
     ): Boolean {
         Timber.tag("TransactionServiceImpl")
-            .d("Submitting transaction with quotation ID ${quotation.id} using strategy ${strategy.name}")
+            .d("Submitting transaction with quotation ID $quotationId using strategy ${authStrategy.name}")
         delay(2000)
-        apiService.submitWithdrawal(
-            quotationId = quotation.id,
-            signedChallenge = quotation.challenge,
-            signingStrategy = strategy.name
+        return apiService.submitTransaction(
+            quotationId = quotationId,
+            signedChallenge = signedChallenge,
+            signingStrategy = authStrategy.name
         )
-        return true
     }
 }

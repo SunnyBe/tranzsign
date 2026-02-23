@@ -1,4 +1,4 @@
-package com.sunday.tranzsign.ui.feature.withdrawal
+package com.sunday.tranzsign
 
 import app.cash.turbine.test
 import com.sunday.tranzsign.domain.entity.EthWalletBalance
@@ -6,8 +6,11 @@ import com.sunday.tranzsign.domain.repository.AccountRepository
 import com.sunday.tranzsign.domain.service.MoneyFormatter
 import com.sunday.tranzsign.domain.service.PrecisionMode
 import com.sunday.tranzsign.domain.service.QuotationService
+import com.sunday.tranzsign.domain.service.TransactionService
+import com.sunday.tranzsign.domain.usecase.signtransaction.SignTransactionState
 import com.sunday.tranzsign.domain.usecase.signtransaction.SignTransactionUseCase
-import com.sunday.tranzsign.domain.usecase.signtransaction.SigningState
+import com.sunday.tranzsign.ui.feature.withdrawal.WithdrawalIntent
+import com.sunday.tranzsign.ui.feature.withdrawal.WithdrawalViewModel
 import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
@@ -34,6 +37,7 @@ class WithdrawalViewModelTest {
     private lateinit var accountRepository: AccountRepository
     private lateinit var quotationService: QuotationService
     private lateinit var signTransactionUseCase: SignTransactionUseCase
+    private lateinit var transactionService: TransactionService
     private lateinit var moneyFormatter: MoneyFormatter
 
     private lateinit var viewModel: WithdrawalViewModel
@@ -46,7 +50,8 @@ class WithdrawalViewModelTest {
 
         accountRepository = mockk()
         quotationService = mockk(relaxed = true)
-        signTransactionUseCase = mockk(relaxed = true)
+        signTransactionUseCase = mockk()
+        transactionService = mockk(relaxed = true)
         moneyFormatter = mockk()
 
         coEvery { accountRepository.getEthWalletBalance() } returns flowOf(
@@ -55,7 +60,9 @@ class WithdrawalViewModelTest {
                 lastUpdatedMillis = System.currentTimeMillis()
             )
         )
-        every { signTransactionUseCase.state } returns MutableStateFlow(SigningState.Idle)
+        every { signTransactionUseCase(any(), any(), any()) } returns MutableStateFlow(
+            SignTransactionState.InProgress
+        )
 
         every { moneyFormatter.format(any(), any(), any()) } answers {
             val amount = firstArg<BigDecimal>()
@@ -65,10 +72,11 @@ class WithdrawalViewModelTest {
         }
 
         viewModel = WithdrawalViewModel(
-            accountRepository,
-            quotationService,
-            signTransactionUseCase,
-            moneyFormatter
+            accountRepository = accountRepository,
+            quotationService = quotationService,
+            signTransactionUseCase = signTransactionUseCase,
+            transactionService = transactionService,
+            moneyFormatter = moneyFormatter
         )
     }
 
@@ -93,7 +101,6 @@ class WithdrawalViewModelTest {
             assertTrue(latestState.isCtaEnabled)
             assertFalse(latestState.isInsufficientBalance)
             assertFalse(latestState.amountExceedsLimit)
-            // Fix Precision: Remaining balance uses STANDARD precision (max 8)
             assertEquals("ETH 3.50000000", latestState.remainingBalanceFormatted)
         }
     }
@@ -107,7 +114,13 @@ class WithdrawalViewModelTest {
                 lastUpdatedMillis = System.currentTimeMillis()
             )
         )
-        viewModel = WithdrawalViewModel(accountRepository, quotationService, signTransactionUseCase, moneyFormatter)
+        viewModel = WithdrawalViewModel(
+            accountRepository = accountRepository,
+            quotationService = quotationService,
+            signTransactionUseCase = signTransactionUseCase,
+            transactionService = transactionService,
+            moneyFormatter = moneyFormatter
+        )
 
         viewModel.uiState.test {
             // Skip initial states
@@ -121,7 +134,6 @@ class WithdrawalViewModelTest {
             assertEquals("1.5", latestState.amountInput)
             assertFalse(latestState.isCtaEnabled)
             assertTrue(latestState.isInsufficientBalance)
-            // Fix Precision: Remaining balance uses STANDARD precision (max 8)
             assertEquals("ETH -0.50000000", latestState.remainingBalanceFormatted)
         }
     }

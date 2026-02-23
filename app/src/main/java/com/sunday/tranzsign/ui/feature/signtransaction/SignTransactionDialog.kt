@@ -39,10 +39,10 @@ import com.sunday.tranzsign.R
 fun SignTransactionDialog(
     amountFormatted: String,
     isSigningInProgress: Boolean,
-    onConfirm: (strategy: TransactionSigningStrategy) -> Unit,
+    onConfirm: (authStrategy: TransactionAuthStrategy) -> Unit,
     onDismiss: () -> Unit
 ) {
-    var selectedStrategy by remember { mutableStateOf(TransactionSigningStrategy.PASSKEY) }
+    var selectedStrategy by remember { mutableStateOf(TransactionAuthStrategy.PASSKEY) }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -106,11 +106,11 @@ fun SignTransactionDialog(
 
 @Composable
 private fun SigningStrategyList(
-    selectedStrategy: TransactionSigningStrategy,
-    onStrategySelected: (TransactionSigningStrategy) -> Unit
+    selectedStrategy: TransactionAuthStrategy,
+    onStrategySelected: (TransactionAuthStrategy) -> Unit
 ) {
     LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        items(TransactionSigningStrategy.entries.toTypedArray()) { strategy ->
+        items(TransactionAuthStrategy.entries.toTypedArray()) { strategy ->
             StrategyItem(
                 strategy = strategy,
                 isSelected = strategy == selectedStrategy,
@@ -122,7 +122,7 @@ private fun SigningStrategyList(
 
 @Composable
 private fun StrategyItem(
-    strategy: TransactionSigningStrategy,
+    strategy: TransactionAuthStrategy,
     isSelected: Boolean,
     onClick: () -> Unit
 ) {
