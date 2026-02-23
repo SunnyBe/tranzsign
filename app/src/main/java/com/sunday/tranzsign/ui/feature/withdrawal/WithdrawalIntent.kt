@@ -7,6 +7,12 @@ import com.sunday.tranzsign.ui.feature.signtransaction.TransactionAuthStrategy
 
 sealed interface WithdrawalIntent {
     data class AmountChanged(val amount: String) : WithdrawalIntent
+    data class DecideQuotation(
+        val quotation: TransactionQuotation,
+        val operationType: OperationType,
+        val isExpired: Boolean
+    ) : WithdrawalIntent
+
     data class RequestQuotation(val operationType: OperationType) : WithdrawalIntent
     data class ConfirmQuotation(
         val quotation: TransactionQuotation,

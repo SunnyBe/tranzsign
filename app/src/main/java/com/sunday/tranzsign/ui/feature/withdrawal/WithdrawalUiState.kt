@@ -25,7 +25,9 @@ sealed interface ScreenContent {
     data object FetchingQuotation : ScreenContent
     data class ShowQuotation(
         val quotation: TransactionQuotation,
-        val operationType: OperationType
+        val operationType: OperationType,
+        val expiryFormatted: String,
+        val isExpired: Boolean
     ) : ScreenContent
 
     data class ShowSignDialog(val signingRequest: SigningRequest) : ScreenContent

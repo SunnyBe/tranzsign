@@ -1,6 +1,7 @@
 package com.sunday.tranzsign.ui.feature.withdrawal
 
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -25,6 +26,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -60,7 +62,8 @@ fun WithdrawalScreen(
     )
 
     when (val content = uiState.screenContent) {
-        is ScreenContent.Idle -> { /* No dialog */ }
+        is ScreenContent.Idle -> { /* No dialog */
+        }
 
         is ScreenContent.FetchingQuotation -> {
             AlertDialog(
@@ -98,18 +101,37 @@ fun WithdrawalScreen(
                                 uiState.quotationFeeFormatted
                             )
                         )
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        Row(modifier = Modifier.fillMaxWidth()) {
+                            if (content.isExpired.not()) {
+                                Text(stringResource(R.string.quotation_expiry_prefix))
+                            }
+                            Text(
+                                modifier = Modifier.padding(horizontal = 2.dp),
+                                text = content.expiryFormatted,
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.ExtraBold
+                            )
+                        }
                     }
                 },
                 confirmButton = {
                     Button(onClick = {
                         viewModel.onEvent(
-                            WithdrawalIntent.ConfirmQuotation(
-                                quotation = content.quotation,
-                                operationType = content.operationType
+                            WithdrawalIntent.DecideQuotation(
+                                content.quotation,
+                                content.operationType,
+                                content.isExpired
                             )
                         )
                     }) {
-                        Text(stringResource(R.string.confirm_label))
+                        if (content.isExpired) {
+                            Text(stringResource(R.string.refresh_label))
+                        } else {
+                            Text(stringResource(R.string.confirm_label))
+                        }
                     }
                 },
                 dismissButton = {

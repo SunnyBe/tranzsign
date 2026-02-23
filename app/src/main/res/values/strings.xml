@@ -41,4 +41,32 @@
     <string name="sending_transaction_title">Sending</string>
     <string name="sending_transaction_message">Uploading transaction</string>
     <string name="unknown_feature_label">unknown</string>
+
+    <string name="time_just_now">Just now</string>
+    <string name="quotation_expiry_prefix">"Expires "</string>
+    <string name="expired">Expired</string>
+    <string name="refresh_label">Refresh</string>
+
+    <!-- Plurals for Remaining Time Countdown -->
+    <plurals name="remaining_time_days">
+        <item quantity="one">in %d day</item>
+        <item quantity="other">in %d days</item>
+    </plurals>
+
+    <plurals name="remaining_time_hours">
+        <item quantity="one">in %d hour</item>
+        <item quantity="other">in %d hours</item>
+    </plurals>
+
+    <plurals name="remaining_time_minutes">
+        <item quantity="one">in %d minute</item>
+        <item quantity="other">in %d minutes</item>
+    </plurals>
+
+    <plurals name="remaining_time_seconds">
+        <item quantity="one">in %d second</item>
+        <item quantity="other">in %d seconds</item>
+
+    </plurals>
+
 </resources>
