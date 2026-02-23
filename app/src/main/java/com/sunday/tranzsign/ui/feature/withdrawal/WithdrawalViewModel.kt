@@ -5,8 +5,10 @@ import androidx.lifecycle.viewModelScope
 import com.sunday.tranzsign.R
 import com.sunday.tranzsign.domain.entity.AuthStrategy
 import com.sunday.tranzsign.domain.entity.OperationType
+import com.sunday.tranzsign.domain.entity.TimeRemaining
 import com.sunday.tranzsign.domain.entity.TransactionQuotation
 import com.sunday.tranzsign.domain.repository.AccountRepository
+import com.sunday.tranzsign.domain.service.DateTimeFormatter
 import com.sunday.tranzsign.domain.service.MoneyFormatter
 import com.sunday.tranzsign.domain.service.PrecisionMode
 import com.sunday.tranzsign.domain.service.QuotationService
@@ -14,11 +16,14 @@ import com.sunday.tranzsign.domain.service.TransactionService
 import com.sunday.tranzsign.domain.usecase.signtransaction.SignTransactionState
 import com.sunday.tranzsign.domain.usecase.signtransaction.SignTransactionUseCase
 import com.sunday.tranzsign.domain.usecase.signtransaction.SigningRequest
+import com.sunday.tranzsign.domain.util.TimeUtil
 import com.sunday.tranzsign.ui.feature.signtransaction.TransactionAuthStrategy
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -28,12 +33,14 @@ import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import timber.log.Timber
 import java.math.BigInteger
 import java.math.RoundingMode
 import javax.inject.Inject
+import kotlin.time.Clock
 
 @HiltViewModel
 class WithdrawalViewModel @Inject constructor(
@@ -41,8 +48,11 @@ class WithdrawalViewModel @Inject constructor(
     private val quotationService: QuotationService,
     private val signTransactionUseCase: SignTransactionUseCase,
     private val transactionService: TransactionService, // Rename to send transaction service
-    private val moneyFormatter: MoneyFormatter
+    private val moneyFormatter: MoneyFormatter,
+    private val timeFormatter: DateTimeFormatter
 ) : ViewModel() {
+
+    private val clock = Clock.System
 
     private val _effect = Channel<WithdrawalEffect>()
     val effect = _effect.receiveAsFlow()
@@ -53,6 +63,8 @@ class WithdrawalViewModel @Inject constructor(
 
     private val _screenContent = MutableStateFlow<ScreenContent>(ScreenContent.Idle)
     private val _amountInput = MutableStateFlow("") // State for the text field
+
+    private var quotationTimerJob: Job? = null
 
     val uiState: StateFlow<WithdrawalUiState> = combine(
         _availableBalanceInWei,
@@ -112,6 +124,14 @@ class WithdrawalViewModel @Inject constructor(
     fun onEvent(intent: WithdrawalIntent) {
         when (intent) {
             is WithdrawalIntent.AmountChanged -> handleAmountChanged(intent.amount)
+            is WithdrawalIntent.DecideQuotation -> {
+                if (intent.isExpired) {
+                    handleRequestQuotation(intent.operationType)
+                } else {
+                    handleConfirmQuotation(intent.quotation, intent.operationType)
+                }
+            }
+
             is WithdrawalIntent.RequestQuotation -> handleRequestQuotation(intent.operationType)
             is WithdrawalIntent.ConfirmQuotation -> handleConfirmQuotation(
                 intent.quotation,
@@ -129,8 +149,16 @@ class WithdrawalViewModel @Inject constructor(
     }
 
     private fun handleAmountChanged(newAmount: String) {
-        _amountInput.value = newAmount
+        val sanitized =
+            if (newAmount.length > 1 && newAmount.startsWith("0") && newAmount[1] != '.') {
+                newAmount.dropWhile { it == '0' }.ifEmpty { "0" }
+            } else {
+                newAmount
+            }
+        _amountInput.value = sanitized
         _quotation.value = null // Invalidate quotation
+        quotationTimerJob?.cancel() // Kill the timer if the user starts typing again
+        _screenContent.value = ScreenContent.Idle // Ensure we reset to Idle
     }
 
     private fun handleRequestQuotation(operationType: OperationType) {
@@ -146,7 +174,7 @@ class WithdrawalViewModel @Inject constructor(
                 val quotation =
                     quotationService.getQuotation(amountInWei, operationType)
                 _quotation.value = quotation
-                _screenContent.value = ScreenContent.ShowQuotation(quotation, operationType)
+                startQuotationTimer(quotation, operationType)
             } catch (cause: Exception) {
                 _screenContent.value = ScreenContent.ShowErrorDialog(R.string.quotation_fetch_error)
                 Timber.tag(LOG_TAG).e(cause, "Failed to create Quotation")
@@ -155,13 +183,14 @@ class WithdrawalViewModel @Inject constructor(
     }
 
     private fun handleConfirmQuotation(
-        quotation: TransactionQuotation?,
+        quotation: TransactionQuotation,
         operationType: OperationType
     ) {
-        val currentQuotation = quotation ?: return
+        quotationTimerJob?.cancel() // Stop the timer as user has made a decision
+
         val signingRequest = SigningRequest(
-            quotationId = currentQuotation.id,
-            challenge = currentQuotation.challenge,
+            quotationId = quotation.id,
+            challenge = quotation.challenge,
             operationType = operationType
         )
         _screenContent.value = ScreenContent.ShowSignDialog(signingRequest)
@@ -239,19 +268,45 @@ class WithdrawalViewModel @Inject constructor(
         _amountInput.value = "" // Reset amount by updating the input state
         _quotation.value = null
         _screenContent.value = ScreenContent.Idle
+        quotationTimerJob?.cancel()
     }
 
     private fun String.ethToWei(): BigInteger {
         val bigDecimal = this.toBigDecimalOrNull() ?: return BigInteger.ZERO
         return bigDecimal.setScale(18, RoundingMode.DOWN) // Truncate excess precision
             .movePointRight(18)
-            .toBigIntegerExact() // Ensure no hidden fractions
+            .toBigInteger()
     }
 
     private fun TransactionAuthStrategy.mapToDomain() = when (this) {
         TransactionAuthStrategy.PASSKEY -> AuthStrategy.PASSKEY
         TransactionAuthStrategy.OTP -> AuthStrategy.OTP
         TransactionAuthStrategy.BIOMETRIC -> AuthStrategy.BIOMETRIC
+    }
+
+    private fun startQuotationTimer(quotation: TransactionQuotation, operationType: OperationType) {
+        quotationTimerJob?.cancel()
+        quotationTimerJob = viewModelScope.launch {
+
+            while (isActive) {
+                val now = clock.now()
+                val timeState = TimeUtil.calculateTimeRemaining(
+                    expiryTimestamp = quotation.expiresAt,
+                    now = now.toEpochMilliseconds()
+                )
+                val isExpired = timeState is TimeRemaining.Expired
+
+                _screenContent.value = ScreenContent.ShowQuotation(
+                    quotation = quotation,
+                    operationType = operationType,
+                    expiryFormatted = timeFormatter.formatRemainingTime(timeState),
+                    isExpired = isExpired
+                )
+
+                if (isExpired) break
+                delay(1000)
+            }
+        }
     }
 
     companion object {
