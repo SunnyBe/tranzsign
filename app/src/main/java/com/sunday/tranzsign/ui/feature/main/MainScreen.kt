@@ -113,10 +113,12 @@ private fun MainFeatures(
             style = MaterialTheme.typography.titleLarge
         )
         features.forEach { feature ->
-            FeatureItem(
-                feature = feature,
-                onClick = onFeatureSelect
-            )
+            if (feature.isActive) { // Only show active features, disabled features will be shown but not clickable
+                FeatureItem(
+                    feature = feature,
+                    onClick = onFeatureSelect
+                )
+            }
         }
     }
 }
@@ -169,6 +171,13 @@ private fun PreviewMainContent() {
             title = R.string.swap_label,
             iconRes = R.drawable.ic_swap_horizontal_circle_24,
             isDisabled = true
+        ),
+        FeatureUiState(
+            id = 3,
+            title = R.string.unknown_feature_label,
+            iconRes = R.drawable.ic_stop_24,
+            isDisabled = true,
+            isActive = false
         )
     )
     MaterialTheme {

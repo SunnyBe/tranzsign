@@ -40,4 +40,5 @@
     <string name="selected_label">Selected</string>
     <string name="sending_transaction_title">Sending</string>
     <string name="sending_transaction_message">Uploading transaction</string>
+    <string name="unknown_feature_label">unknown</string>
 </resources>

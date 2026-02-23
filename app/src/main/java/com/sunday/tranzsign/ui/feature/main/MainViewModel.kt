@@ -19,8 +19,6 @@ import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import timber.log.Timber
-import java.math.BigDecimal
-import java.math.BigInteger
 import javax.inject.Inject
 
 @HiltViewModel
@@ -62,7 +60,16 @@ class MainViewModel @Inject constructor(
                         isDisabled = feature.isDisabled
                     )
 
-                    else -> throw IllegalStateException("Unexpected feature title(${feature.title})")
+                    else -> {
+                        Timber.tag(LOG_TAG).e("Unknown feature title: ${feature.title}")
+                        FeatureUiState(
+                            id = feature.id,
+                            title = R.string.unknown_feature_label,
+                            iconRes = R.drawable.ic_stop_24,
+                            isDisabled = true,
+                            isActive = false
+                        )
+                    }
                 }
             }
             MainUiState(
@@ -70,7 +77,7 @@ class MainViewModel @Inject constructor(
                 walletBalanceUiState = WalletBalanceUiState(
                     introTitle = userAccount.displayName,
                     currentBalance = moneyFormatter.format(
-                        amount = walletBalance.balanceInWei.toEth(),
+                        amountInWei = walletBalance.balanceInWei,
                         precisionMode = PrecisionMode.Standard
                     ),
                     lastBalanceUpdate = dateTimeFormatter.formatFullDateTime(walletBalance.lastUpdatedMillis)
@@ -109,10 +116,7 @@ class MainViewModel @Inject constructor(
         }
     }
 
-    private fun BigInteger.toEth(): BigDecimal = this.toBigDecimal().movePointLeft(ETH_DECIMALS)
-
     companion object {
         private const val LOG_TAG = "MainViewModel"
-        private const val ETH_DECIMALS = 18
     }
 }

@@ -1,6 +1,7 @@
 package com.sunday.tranzsign.domain.service
 
-import java.math.BigDecimal
+import java.math.BigInteger
+import java.util.Locale
 
 /**
  * Formats currency values into localized strings.
@@ -9,13 +10,14 @@ import java.math.BigDecimal
  */
 interface MoneyFormatter {
     fun format(
-        amount: BigDecimal,
+        amountInWei: BigInteger,
         currencyCode: String = "ETH",
-        precisionMode: PrecisionMode = PrecisionMode.Detail
+        precisionMode: PrecisionMode = PrecisionMode.Detail,
+        locale: Locale = Locale.getDefault()
     ): String
 }
 
 enum class PrecisionMode(val min: Int, val max: Int) {
     Standard(min = 4, max = 4), // For Balances/Inputs
-    Detail(min = 6, max = 8),   // For Gas/Fees
+    Detail(min = 8, max = 8),   // For Gas/Fees
 }

@@ -8,7 +8,8 @@ data class FeatureUiState(
     val id: Int,
     @param:StringRes val title: Int,
     @param:DrawableRes val iconRes: Int,
-    val isDisabled: Boolean = false
+    val isDisabled: Boolean = false,
+    val isActive: Boolean = true
 )
 
 data class WalletBalanceUiState(

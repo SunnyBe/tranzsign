@@ -28,9 +28,9 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
-import java.math.BigDecimal
 import java.math.BigInteger
 import java.math.RoundingMode
+import java.util.Locale
 
 @ExperimentalCoroutinesApi
 class WithdrawalViewModelTest {
@@ -64,11 +64,19 @@ class WithdrawalViewModelTest {
             SignTransactionState.InProgress
         )
 
-        every { moneyFormatter.format(any(), any(), any()) } answers {
-            val amount = firstArg<BigDecimal>()
+        every { moneyFormatter.format(any<BigInteger>(), any(), any()) } answers {
+            val amountInWei = firstArg<BigInteger>()
             val precision = thirdArg<PrecisionMode>()
-            val formattedAmount = amount.setScale(precision.max, RoundingMode.DOWN).toPlainString()
-            "ETH $formattedAmount"
+
+            // Simulate the real implementation's logic
+            val amountInEth = amountInWei.toBigDecimal().movePointLeft(18)
+            val numberFormat = java.text.NumberFormat.getNumberInstance(Locale.US)
+            numberFormat.minimumFractionDigits = precision.min
+            numberFormat.maximumFractionDigits = precision.max
+            numberFormat.roundingMode = RoundingMode.DOWN
+
+            val formattedNumber = numberFormat.format(amountInEth)
+            "ETH $formattedNumber"
         }
 
         viewModel = WithdrawalViewModel(

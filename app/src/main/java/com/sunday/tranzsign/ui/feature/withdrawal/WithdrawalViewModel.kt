@@ -3,11 +3,12 @@ package com.sunday.tranzsign.ui.feature.withdrawal
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.sunday.tranzsign.R
-import com.sunday.tranzsign.domain.entity.OperationType
 import com.sunday.tranzsign.domain.entity.AuthStrategy
+import com.sunday.tranzsign.domain.entity.OperationType
 import com.sunday.tranzsign.domain.entity.TransactionQuotation
 import com.sunday.tranzsign.domain.repository.AccountRepository
 import com.sunday.tranzsign.domain.service.MoneyFormatter
+import com.sunday.tranzsign.domain.service.PrecisionMode
 import com.sunday.tranzsign.domain.service.QuotationService
 import com.sunday.tranzsign.domain.service.TransactionService
 import com.sunday.tranzsign.domain.usecase.signtransaction.SignTransactionState
@@ -27,7 +28,6 @@ import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import timber.log.Timber
-import java.math.BigDecimal
 import java.math.BigInteger
 import java.math.RoundingMode
 import javax.inject.Inject
@@ -61,23 +61,25 @@ class WithdrawalViewModel @Inject constructor(
         val remainingInWei = balanceWei - amountInWei - (quote?.feeInWei ?: BigInteger.ZERO)
         val isAmountPositive = amountInWei > BigInteger.ZERO
         val hasSufficientBalance = remainingInWei >= BigInteger.ZERO
-        val exceedsLimit =
-            amountInWei > MAX_WITHDRAWAL_ETH.movePointRight(ETH_DECIMALS).toBigInteger()
+        val exceedsLimit = amountInWei > MAX_WITHDRAWAL_IN_WEI
         val amountToTransferWei = quote?.amountInWei?.plus(quote.feeInWei) ?: BigInteger.ZERO
 
         WithdrawalUiState(
-            amountToTransferFormatted = moneyFormatter.format(amountToTransferWei.toEth()),
-            availableBalanceFormatted = moneyFormatter.format(balanceWei.toEth()),
-            remainingBalanceFormatted = moneyFormatter.format(remainingInWei.toEth()),
-            amountInput = amountInput, // Pass the input directly through
+            amountToTransferFormatted = moneyFormatter.format(amountToTransferWei),
+            availableBalanceFormatted = moneyFormatter.format(balanceWei),
+            remainingBalanceFormatted = moneyFormatter.format(remainingInWei),
+            amountInput = amountInput,
             isCtaEnabled = isAmountPositive && hasSufficientBalance && !exceedsLimit,
             isInsufficientBalance = isAmountPositive && !hasSufficientBalance,
             amountExceedsLimit = exceedsLimit,
-            ethMaxLimitFormatted = MAX_WITHDRAWAL_ETH.toPlainString(),
-            quotationAmountFormatted = quote?.let { moneyFormatter.format(it.amountInWei.toEth()) }
-                ?: "",
-            quotationFeeFormatted = quote?.let { moneyFormatter.format(it.feeInWei.toEth()) }
-                ?: "",
+            ethMaxLimitFormatted = moneyFormatter.format(MAX_WITHDRAWAL_IN_WEI),
+            quotationAmountFormatted = quote?.let {
+                moneyFormatter.format(
+                    amountInWei = it.amountInWei,
+                    precisionMode = PrecisionMode.Detail
+                )
+            } ?: "",
+            quotationFeeFormatted = quote?.let { moneyFormatter.format(it.feeInWei) } ?: "",
             screenContent = screenContent
         )
     }.stateIn(
@@ -183,17 +185,25 @@ class WithdrawalViewModel @Inject constructor(
                                 quotationId = signingState.result.quotationId,
                                 signedChallenge = signingState.result.signedChallenge
                             )
-                        val submitted = transactionService.submit(
-                            signingState.result.quotationId,
-                            signingState.result.signedChallenge,
-                            strategy.mapToDomain()
-                        )
-                        if (submitted) _screenContent.value = ScreenContent.ShowSuccessDialog(
-                            R.string.withdrawal_success_message
-                        ) else _screenContent.value = ScreenContent.ShowErrorDialog(
-                            R.string.signing_failed_error,
-                            isCritical = false
-                        )
+
+                        val result = runCatching {
+                            transactionService.submit(
+                                signingState.result.quotationId,
+                                signingState.result.signedChallenge,
+                                strategy.mapToDomain()
+                            )
+                        }.getOrDefault(false)
+
+                        if (result) {
+                            _screenContent.value = ScreenContent.ShowSuccessDialog(
+                                R.string.withdrawal_success_message
+                            )
+                        } else {
+                            _screenContent.value = ScreenContent.ShowErrorDialog(
+                                R.string.signing_failed_error,
+                                isCritical = false
+                            )
+                        }
                     }
 
                     is SignTransactionState.Error -> {
@@ -214,13 +224,10 @@ class WithdrawalViewModel @Inject constructor(
     }
 
     private fun dismissDialog() {
-        _screenContent.value = ScreenContent.Idle // Reset screen content to hide any dialog
         _amountInput.value = "" // Reset amount by updating the input state
         _quotation.value = null
         _screenContent.value = ScreenContent.Idle
     }
-
-    private fun BigInteger.toEth(): BigDecimal = this.toBigDecimal().movePointLeft(ETH_DECIMALS)
 
     private fun String.ethToWei(): BigInteger {
         val bigDecimal = this.toBigDecimalOrNull() ?: return BigInteger.ZERO
@@ -237,7 +244,6 @@ class WithdrawalViewModel @Inject constructor(
 
     companion object {
         private const val LOG_TAG = "WithdrawalViewModel"
-        private const val ETH_DECIMALS = 18
-        private val MAX_WITHDRAWAL_ETH = BigDecimal("10.00")
+        private val MAX_WITHDRAWAL_IN_WEI = BigInteger("10000000000000000000") // 10 ETH in WEI
     }
 }
