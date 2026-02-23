@@ -16,7 +16,7 @@ In a withdrawal flow, everything is interdependent: your balance, your input, th
 
 **High-Level Architectural Overview**
 
-![Basic Architectural Overview High-level](./docs/basic_architectural_overview.png)
+![Basic Architectural Overview High-level](docs/basic_architectural_overview.png)
 
 ### Financial Accuracy & UI Stability
 To avoid the precision loss inherent in floating-point math, all internal logic uses `BigInteger` (Wei). This ensures our app logic mirrors the Ethereum protocol exactly.
