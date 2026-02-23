@@ -16,6 +16,8 @@ import com.sunday.tranzsign.domain.usecase.signtransaction.SignTransactionUseCas
 import com.sunday.tranzsign.domain.usecase.signtransaction.SigningRequest
 import com.sunday.tranzsign.ui.feature.signtransaction.TransactionAuthStrategy
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -27,6 +29,7 @@ import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import timber.log.Timber
 import java.math.BigInteger
 import java.math.RoundingMode
@@ -186,23 +189,32 @@ class WithdrawalViewModel @Inject constructor(
                                 signedChallenge = signingState.result.signedChallenge
                             )
 
-                        val result = runCatching {
-                            transactionService.submit(
-                                signingState.result.quotationId,
-                                signingState.result.signedChallenge,
-                                strategy.mapToDomain()
-                            )
-                        }.getOrDefault(false)
+                        // We wrap the submission in NonCancellable to ensure the transaction
+                        // reaches the network even if the user navigates away or the ViewModel
+                        // is cleared mid-broadcast.
+                        // See README: "Transaction Integrity vs. Memory Management" for trade-offs.
+                        withContext(NonCancellable) {
+                            val result = runCatching {
+                                transactionService.submit(
+                                    signingState.result.quotationId,
+                                    signingState.result.signedChallenge,
+                                    strategy.mapToDomain()
+                                )
+                            }.getOrDefault(false)
 
-                        if (result) {
-                            _screenContent.value = ScreenContent.ShowSuccessDialog(
-                                R.string.withdrawal_success_message
-                            )
-                        } else {
-                            _screenContent.value = ScreenContent.ShowErrorDialog(
-                                R.string.signing_failed_error,
-                                isCritical = false
-                            )
+                            // Memory Leak is expected here if the VM was cleared; we prioritize transaction integrity.
+                            withContext(Dispatchers.Main) {
+                                if (result) {
+                                    _screenContent.value = ScreenContent.ShowSuccessDialog(
+                                        R.string.withdrawal_success_message
+                                    )
+                                } else {
+                                    _screenContent.value = ScreenContent.ShowErrorDialog(
+                                        R.string.signing_failed_error,
+                                        isCritical = false
+                                    )
+                                }
+                            }
                         }
                     }
 

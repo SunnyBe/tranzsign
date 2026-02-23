@@ -23,6 +23,14 @@ To avoid the precision loss inherent in floating-point math, all internal logic 
 * **Conservative Truncation:** I enforced `RoundingMode.DOWN` for all displays. Rounding up a balance can lead to "Insufficient Funds" errors at the protocol level; truncation ensures we never promise a balance that the blockchain cannot fulfill.
 * **The "Zero-Display" Problem:** To keep the UI clean, I standardized on a 4-decimal display. However, for non-zero values smaller than `0.0001`, the app renders `< 0.0001 ETH`. This provides visual confirmation that "dust" exists, preventing the customer support friction that occurs when a balance incorrectly appears as `0.000`.
 
+### Transaction Integrity vs. Memory Management
+A critical challenge in mobile wallet engineering is the "Orphaned Signature"—where a transaction is signed but the broadcast is interrupted by navigation or process death.
+
+I prioritized **Transaction Integrity** by utilizing `withContext(NonCancellable)` during the submission phase.
+* **The Choice:** If a user confirms a transaction and immediately exits the screen, the coroutine ignores the cancellation signal from the `viewModelScope` until the broadcast completes.
+* **The Trade-off:** This creates a temporary "controlled leak" where the ViewModel stays in memory for a few additional seconds. This is a deliberate architectural choice to avoid the risk of un-broadcasted signatures, which is a higher risk in financial software than short-lived memory pressure.
+* **The Production Path:** In a production-grade implementation, this logic would be moved to **WorkManager**. The signed challenge would be persisted to a local database (Room) to trigger a unique `OneTimeWorkRequest`. This is the necessary architectural pattern to ensure a signed transaction reaches the backend even in the event of a force-kill or device reboot.
+
 ### Global-Ready Formatting
 The formatting engine is decoupled into a dedicated `MoneyFormatter`. It respects the User's OS Locale for decimal separators and intelligently places the "ETH" symbol based on regional standards (e.g., `1.2 ETH` vs `ETH 1,2`), ensuring the app feels like a native tool for a global audience.
 
